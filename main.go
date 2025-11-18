@@ -8,6 +8,8 @@ import (
 func main() {
 	multiplexer := http.NewServeMux()
 
+	multiplexer.Handle("/", http.FileServer(http.Dir(".")))
+
 	if multiplexer == nil {
 		log.Fatal("Allocation error!!!")
 	}
@@ -16,7 +18,7 @@ func main() {
 		Addr: ":8080",
 		Handler: multiplexer,
 	}
-	
+
 	defer server.Close()
 
 	if err := server.ListenAndServe(); err != nil {

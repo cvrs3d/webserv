@@ -1,0 +1,34 @@
+# Binaries for programs and plugins
+/bin/
+/pkg/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binaries and build outputs
+*.test
+*.out
+coverage.out
+*.coverprofile
+out
+
+# Dependency directories (uncomment if you don't commit vendor/)
+# vendor/
+
+# Go workspace (optional)
+go.work
+go.work.sum
+
+# IDEs and editors
+.idea/
+*.iml
+.vscode/
+*.sublime-*
+*.swp
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
