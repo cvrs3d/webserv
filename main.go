@@ -9,6 +9,7 @@ func main() {
 	multiplexer := http.NewServeMux()
 
 	multiplexer.Handle("/", http.FileServer(http.Dir(".")))
+	multiplexer.Handle("/assets", http.FileServer(http.Dir("./assets")))
 
 	if multiplexer == nil {
 		log.Fatal("Allocation error!!!")
