@@ -110,3 +110,49 @@ func (cfg *apiConfig) validateHandler(w http.ResponseWriter, r *http.Request) {
 
 	respondWithJSON(w, 201, response)
 }
+
+func (cfg *apiConfig) getChirpsHandler(w http.ResponseWriter, r *http.Request) {
+	chirpsDTOS, err := cfg.db.GetChirps(r.Context()) 
+
+	if err != nil {
+		log.Printf("Error retrieving chirps: %s", err)
+		respondWithError(w, 500, "Something went wrong")
+		return
+	}
+
+	responseChirps := make([]Chirp, len(chirpsDTOS))
+
+	for i, c := range chirpsDTOS {
+		responseChirps[i] = MapChirpDTOToChirp(c)
+	}
+
+	respondWithJSON(w, 200, responseChirps)
+}
+
+func (cfg *apiConfig) getChirpByIDHandler(w http.ResponseWriter, r *http.Request) {
+	id := r.PathValue("chirp_id")
+
+	if len(id) == 0 {
+		log.Printf("Error getting chirp_id")
+		respondWithError(w, 404, "Not found")
+		return
+	}
+
+	uid, err := uuid.Parse(id)
+	if err != nil {
+		log.Printf("Error parsing uuid: %s", err)
+		respondWithError(w, 500, "Something went wrong")
+		return
+	}
+
+	chirpDTO, err := cfg.db.GetChirpByID(r.Context(), uid)
+	if err != nil {
+		log.Printf("Error retrieving chirp: %s", err)
+		respondWithError(w, 404, "Nor found")
+		return
+	}
+
+	response := MapChirpDTOToChirp(chirpDTO)
+
+	respondWithJSON(w, 200, response)
+}
