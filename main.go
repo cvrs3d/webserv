@@ -21,6 +21,7 @@ func main() {
 	multiplexer.HandleFunc("GET /api/healthz", healthHandler)
 	multiplexer.HandleFunc("GET /admin/metrics", apiCfg.metricsHandler)
 	multiplexer.HandleFunc("POST /admin/reset", apiCfg.resetHandler)
+	multiplexer.HandleFunc("POST /api/validate_chirp", validateHandler)
 
 	if multiplexer == nil {
 		log.Fatal("Allocation error!!!")
