@@ -1,8 +1,13 @@
 package auth
 
+
 import (
+    "testing"
+    "time"
 	"log"
-	"testing"
+
+    "github.com/google/uuid"
+    "github.com/stretchr/testify/require"
 )
 
 
@@ -38,4 +43,46 @@ func TestHashingPasswords(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMakeAndValidateJWT_Success(t *testing.T) {
+    secret := "super-secret-key-123"
+    userID := uuid.New()
+    expiresIn := time.Minute * 10
+
+    token, err := MakeJWT(userID, secret, expiresIn)
+    require.NoError(t, err, "MakeJWT should not error")
+
+    gotUserID, err := ValidateJWT(token, secret)
+    require.NoError(t, err, "ValidateJWT should succeed")
+    require.Equal(t, userID, gotUserID, "ValidateJWT should return the same userID that was signed")
+}
+
+func TestValidateJWT_WrongSecret(t *testing.T) {
+    secret := "super-secret-key-123"
+    wrongSecret := "wrong-key"
+    userID := uuid.New()
+    expiresIn := time.Minute * 10
+
+    token, err := MakeJWT(userID, secret, expiresIn)
+    require.NoError(t, err)
+
+    _, err = ValidateJWT(token, wrongSecret)
+    require.Error(t, err, "ValidateJWT should error if secret is wrong")
+}
+
+func TestValidateJWT_ExpiredToken(t *testing.T) {
+    secret := "super-secret-key-123"
+    userID := uuid.New()
+    // expire immediately
+    expiresIn := time.Millisecond * 1
+
+    token, err := MakeJWT(userID, secret, expiresIn)
+    require.NoError(t, err)
+
+    // wait for it to expire
+    time.Sleep(time.Millisecond * 5)
+
+    _, err = ValidateJWT(token, secret)
+    require.Error(t, err, "ValidateJWT should error for expired token")
 }
