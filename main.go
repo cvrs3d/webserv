@@ -41,6 +41,7 @@ func main() {
 	multiplexer.HandleFunc("GET /admin/metrics", apiCfg.metricsHandler)
 	multiplexer.HandleFunc("POST /admin/reset", apiCfg.resetHandler)
 	multiplexer.HandleFunc("POST /api/users", apiCfg.usersHandler)
+	multiplexer.HandleFunc("POST /api/login", apiCfg.loginHandler)
 	multiplexer.HandleFunc("POST /api/chirps", apiCfg.validateHandler)
 	multiplexer.HandleFunc("GET /api/chirps", apiCfg.getChirpsHandler)
 	multiplexer.HandleFunc("GET /api/chirps/{chirp_id}", apiCfg.getChirpByIDHandler)

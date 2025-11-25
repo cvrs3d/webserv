@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"sync/atomic"
 
+	"github.com/cvrs3d/webserv/internal/auth"
 	"github.com/cvrs3d/webserv/internal/database"
 	"github.com/google/uuid"
 )
@@ -57,6 +58,7 @@ func (cfg *apiConfig) resetHandler(w http.ResponseWriter, r *http.Request) {
 func (cfg *apiConfig) usersHandler(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Email string `json:"email"`
+		Password string `json:"password"`
 	}
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
@@ -66,7 +68,11 @@ func (cfg *apiConfig) usersHandler(w http.ResponseWriter, r *http.Request) {
 		respondWithError(w, 500, "Something went wrong")
 		return
 	}
-	userDTO, err := cfg.db.CreateUser(r.Context(), params.Email)
+	password_hash, _ := auth.HashPassword(params.Password)
+	userDTO, err := cfg.db.CreateUser(r.Context(), database.CreateUserParams{
+		Email: params.Email,
+		HashedPassword: password_hash,
+	})
 	if err != nil {
 		log.Printf("Error making querry: %s", err)
 		respondWithError(w, 500, "Something went wrong")
@@ -155,4 +161,34 @@ func (cfg *apiConfig) getChirpByIDHandler(w http.ResponseWriter, r *http.Request
 	response := MapChirpDTOToChirp(chirpDTO)
 
 	respondWithJSON(w, 200, response)
+}
+
+func (cfg *apiConfig) loginHandler(w http.ResponseWriter, r *http.Request) {
+	type parameters struct {
+		Email string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	decoder := json.NewDecoder(r.Body)
+	params := parameters{}
+	err := decoder.Decode(&params)
+	if err != nil {
+		log.Printf("Error decoding parameters: %s", err)
+		respondWithError(w, 500, "Something went wrong")
+		return
+	}
+	userDTO, err := cfg.db.GetUserByEmail(r.Context(), params.Email)
+	if err != nil {
+		log.Printf("Error connecting to db: %s", err)
+		respondWithError(w, 500, "Something went wrong")
+		return
+	}
+	if flag, _ := auth.CheckPasswordHash(params.Password, userDTO.HashedPassword); !flag {
+		respondWithError(w, 401, "Incorrect email or password")
+		return
+	}
+
+	user := MapUserDTOToUser(userDTO)
+
+	respondWithJSON(w, 200, user)
 }
