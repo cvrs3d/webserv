@@ -1,6 +1,7 @@
 package main
 
 import (
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -217,8 +218,85 @@ func (cfg *apiConfig) loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	refreshToken, _ := auth.MakeRefreshToken()
+	parsedToken, _ := uuid.Parse(refreshToken)
+	rt, err := cfg.db.CreateRefreshToken(r.Context(), database.CreateRefreshTokenParams{
+		Token: parsedToken,
+		UserID: userDTO.ID,
+		ExpiresAt: time.Now().Add(time.Hour * 24 * time.Duration(60)),
+		RevokedAt: sql.NullTime{},
+	})
+	if err != nil {
+		log.Printf("Error constructing the Refresh token: %s", err)
+		respondWithError(w, 500, "Something went wrong")
+		return
+	}
+
 	user := MapUserDTOToUser(userDTO)
-	user.Token = jwt
+	user.JWTToken = jwt
+	user.RefreshToken = rt.Token.String()
 
 	respondWithJSON(w, 200, user)
+}
+
+
+func (cfg *apiConfig) refreshHandler(w http.ResponseWriter, r *http.Request) {
+	type response struct {
+		Token string `json:"token"`
+	}
+	token, err := auth.GetBearerToken(r.Header)
+
+	if err != nil {
+		log.Printf("Error fetching refresh token from a header: %s", err)
+		respondWithError(w, 401, "Refresh token is not present")
+		return
+	}
+
+	parsedToken, _ := uuid.Parse(token)
+
+	tokenDTO, err := cfg.db.GetRefreshTokenByToken(r.Context(), parsedToken)
+
+	if err == sql.ErrNoRows {
+		log.Printf("Error refresh token has expired or doesn't exists: %s", err)
+		respondWithError(w, 401, "Refresh token has expired or doesn't exists")
+		return
+	}
+
+	if err != nil {
+		log.Printf("Error executing query: %s", err)
+		respondWithError(w, 500, "Something went wrong")
+		return
+	}
+
+	jwt, err := auth.MakeJWT(tokenDTO.UserID, cfg.secret, time.Duration(1) * time.Hour)
+
+	if err != nil {
+		log.Printf("Error : %s", err)
+		respondWithError(w, 500, "Something went wrong")
+		return
+	}
+
+	respondWithJSON(w, 200, response {
+		Token: jwt,
+	})
+}
+
+func (cfg *apiConfig) revokeHandler(w http.ResponseWriter, r *http.Request) {
+	token, err := auth.GetBearerToken(r.Header)
+
+	if err != nil {
+		log.Printf("Error fetching refresh token from a header: %s", err)
+		respondWithError(w, 401, "Refresh token is not present")
+		return
+	}
+
+	parsedToken, _ := uuid.Parse(token)
+
+	if err := cfg.db.UpdateRefreshToken(r.Context(), parsedToken); err != nil {
+		log.Printf("Error fetching refresh token from a database: %s", err)
+		respondWithError(w, 401, "Refresh token is right")
+		return	
+	}
+
+	respondWithJSON(w, 204, struct{}{})
 }
