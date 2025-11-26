@@ -39,16 +39,22 @@ func main() {
 	assetsHandler := http.StripPrefix("/app/assets", http.FileServer(http.Dir("./assets")))
 	multiplexer.Handle("/app/assets", apiCfg.middlewareMetrics(assetsHandler))
 	multiplexer.Handle("/app/assets/", apiCfg.middlewareMetrics(assetsHandler))
+
 	multiplexer.HandleFunc("GET /api/healthz", healthHandler)
+	multiplexer.HandleFunc("GET /api/chirps/{chirp_id}", apiCfg.getChirpByIDHandler)
 	multiplexer.HandleFunc("GET /admin/metrics", apiCfg.metricsHandler)
+	multiplexer.HandleFunc("GET /api/chirps", apiCfg.getChirpsHandler)
+
 	multiplexer.HandleFunc("POST /admin/reset", apiCfg.resetHandler)
 	multiplexer.HandleFunc("POST /api/users", apiCfg.usersHandler)
 	multiplexer.HandleFunc("POST /api/login", apiCfg.loginHandler)
 	multiplexer.HandleFunc("POST /api/refresh", apiCfg.refreshHandler)
 	multiplexer.HandleFunc("POST /api/revoke", apiCfg.revokeHandler)
 	multiplexer.HandleFunc("POST /api/chirps", apiCfg.validateHandler)
-	multiplexer.HandleFunc("GET /api/chirps", apiCfg.getChirpsHandler)
-	multiplexer.HandleFunc("GET /api/chirps/{chirp_id}", apiCfg.getChirpByIDHandler)
+
+	multiplexer.HandleFunc("PUT /api/users", apiCfg.updateUserHandler)
+	
+	multiplexer.HandleFunc("DELETE /api/chirps/{chirpID}", apiCfg.deleteChirpByIDHandler)
 	
 
 

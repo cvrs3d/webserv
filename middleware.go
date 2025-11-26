@@ -300,3 +300,54 @@ func (cfg *apiConfig) revokeHandler(w http.ResponseWriter, r *http.Request) {
 
 	respondWithJSON(w, 204, struct{}{})
 }
+
+func (cfg *apiConfig) updateUserHandler(w http.ResponseWriter, r *http.Request)  {
+	type parameters struct {
+		Email string `json:"email"`
+		Password string `json:"password"`
+	}
+	token, err := auth.GetBearerToken(r.Header)
+
+	if err != nil {
+		log.Printf("Error fetching access token from a header: %s", err)
+		respondWithError(w, 401, "Access token is not present")
+		return
+	}
+
+	user_id, err := auth.ValidateJWT(token, cfg.secret)
+	if err != nil {
+		log.Printf("Error token is not valid: %s", err)
+		respondWithError(w, 401, "Access token is not valid")
+		return
+	}
+
+	params := parameters{}
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&params); err != nil {
+		log.Printf("Error decoding parameters: %s", err)
+		respondWithError(w, 500, "Something went wrong")
+		return
+	}
+
+	hashedPassword, _ := auth.HashPassword(params.Password)
+
+	log.Printf("Email: %s Password %s", params.Email, hashedPassword)
+	userDTO, err := cfg.db.UpdateUser(r.Context(), database.UpdateUserParams{
+		ID: user_id,
+		HashedPassword: hashedPassword,
+		Email: params.Email,
+	})
+	if err != nil {
+		log.Printf("Error updating user: %s", err)
+		respondWithError(w, 500, "Something went wrong")
+		return
+	}
+
+	user := MapUserDTOToUser(userDTO)
+
+	respondWithJSON(w, 200, user)
+}
+
+func (cfg *apiConfig) updateUserHandler(w http.ResponseWriter, r *http.Request) {
+	
+}
