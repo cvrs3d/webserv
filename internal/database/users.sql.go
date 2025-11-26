@@ -40,7 +40,7 @@ func (q *Queries) CreateUser(ctx context.Context, arg CreateUserParams) (User, e
 }
 
 const deleteUsers = `-- name: DeleteUsers :exec
-DELETE FROM users WHERE 1=1
+DELETE FROM users
 `
 
 func (q *Queries) DeleteUsers(ctx context.Context) error {

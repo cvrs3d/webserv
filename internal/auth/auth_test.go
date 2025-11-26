@@ -1,13 +1,13 @@
 package auth
 
-
 import (
-    "testing"
-    "time"
 	"log"
+	"net/http"
+	"testing"
+	"time"
 
-    "github.com/google/uuid"
-    "github.com/stretchr/testify/require"
+	"github.com/google/uuid"
+	"github.com/stretchr/testify/require"
 )
 
 
@@ -85,4 +85,86 @@ func TestValidateJWT_ExpiredToken(t *testing.T) {
 
     _, err = ValidateJWT(token, secret)
     require.Error(t, err, "ValidateJWT should error for expired token")
+}
+
+func TestGetBearerToken(t *testing.T) {
+    tests := []struct {
+        name        string
+        headerValue string
+        wantToken   string
+        wantErr     bool
+        errContains string
+    }{
+        {
+            name:        "missing Authorization header",
+            headerValue: "",
+            wantToken:   "",
+            wantErr:     true,
+            errContains: "authorization header missing",
+        },
+        {
+            name:        "empty header value",
+            headerValue: "   ",
+            wantToken:   "",
+            wantErr:     true,
+            errContains: "authorization header format",
+        },
+        {
+            name:        "wrong scheme",
+            headerValue: "Basic someToken",
+            wantToken:   "",
+            wantErr:     true,
+            errContains: "authorization scheme must be Bearer",
+        },
+        {
+            name:        "only scheme no token",
+            headerValue: "Bearer",
+            wantToken:   "",
+            wantErr:     true,
+            errContains: "authorization header format",
+        },
+        {
+            name:        "token empty after scheme",
+            headerValue: "Bearer  ",
+            wantToken:   "",
+            wantErr:     true,
+            errContains: "authorization token is empty",
+        },
+        {
+            name:        "valid bearer token lowercase scheme",
+            headerValue: "bearer abc.def.ghi",
+            wantToken:   "abc.def.ghi",
+            wantErr:     false,
+        },
+        {
+            name:        "valid bearer token uppercase scheme",
+            headerValue: "BEARER xyz123",
+            wantToken:   "xyz123",
+            wantErr:     false,
+        },
+        {
+            name:        "valid bearer token with extra spaces",
+            headerValue: "  Bearer   jwt.token.string  ",
+            wantToken:   "jwt.token.string",
+            wantErr:     false,
+        },
+    }
+
+    for _, tc := range tests {
+        t.Run(tc.name, func(t *testing.T) {
+            headers := http.Header{}
+            if tc.headerValue != "" {
+                headers.Set("Authorization", tc.headerValue)
+            }
+
+            tok, err := GetBearerToken(headers)
+            if tc.wantErr {
+                require.Error(t, err)
+                require.Contains(t, err.Error(), tc.errContains)
+            } else {
+                require.NoError(t, err)
+                require.Equal(t, tc.wantToken, tok)
+            }
+        })
+    }
 }

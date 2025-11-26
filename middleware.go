@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"sync/atomic"
+	"time"
 
 	"github.com/cvrs3d/webserv/internal/auth"
 	"github.com/cvrs3d/webserv/internal/database"
@@ -17,6 +18,7 @@ type apiConfig struct {
 	fileserverHits atomic.Int32
 	db *database.Queries
 	platform string
+	secret string
 }
 
 func (cfg *apiConfig) middlewareMetrics(next http.Handler) http.Handler {
@@ -87,10 +89,24 @@ func (cfg *apiConfig) validateHandler(w http.ResponseWriter, r *http.Request) {
 		Body string `json:"body"`
 		UserID uuid.UUID `json:"user_id"`
 	}
+	
+	token, err := auth.GetBearerToken(r.Header)
+	if err != nil {
+		log.Printf("Error getting bearer roken: %s", err)
+		respondWithError(w, 401, "Missing header")
+		return
+	}
+
+	user_id, err := auth.ValidateJWT(token, cfg.secret)
+	if err != nil {
+		log.Printf("Token not valid: %s", err)
+		respondWithError(w, 401, "Auth token is not valid")
+		return	
+	}
+
 	decoder := json.NewDecoder(r.Body)
 	params := parameters{}
-	err := decoder.Decode(&params)
-	if err != nil {
+	if err := decoder.Decode(&params); err != nil {
 		log.Printf("Error decoding parameters: %s", err)
 		respondWithError(w, 500, "Something went wrong")
 		return
@@ -103,11 +119,11 @@ func (cfg *apiConfig) validateHandler(w http.ResponseWriter, r *http.Request) {
 
 	chirpDTO, err := cfg.db.CreateChirp(r.Context(), database.CreateChirpParams{
 		Body: params.Body,
-		UserID: params.UserID,
+		UserID: user_id,
 	})
 
 	if err != nil {
-		log.Printf("Error creating Chirp DTO: %s", err)
+		log.Printf("Error creating Chirp DTO: %s, user_id used: %s", err, user_id.String())
 		respondWithError(w, 500, "Something went wrong")
 		return
 	}
@@ -167,6 +183,7 @@ func (cfg *apiConfig) loginHandler(w http.ResponseWriter, r *http.Request) {
 	type parameters struct {
 		Email string `json:"email"`
 		Password string `json:"password"`
+		EIS int `json:"expires_in_seconds,omitempty"`
 	}
 
 	decoder := json.NewDecoder(r.Body)
@@ -188,7 +205,20 @@ func (cfg *apiConfig) loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if params.EIS < 1 || params.EIS > 60 {
+		params.EIS = 60
+	}
+
+	jwt, err := auth.MakeJWT(userDTO.ID, cfg.secret, time.Second * time.Duration(params.EIS))
+
+	if err != nil {
+		log.Printf("Error constructing the JWT: %s", err)
+		respondWithError(w, 500, "Something went wrong")
+		return
+	}
+
 	user := MapUserDTOToUser(userDTO)
+	user.Token = jwt
 
 	respondWithJSON(w, 200, user)
 }
