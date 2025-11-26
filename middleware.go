@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"sort"
 	"sync/atomic"
 	"time"
 
@@ -137,6 +138,7 @@ func (cfg *apiConfig) validateHandler(w http.ResponseWriter, r *http.Request) {
 
 func (cfg *apiConfig) getChirpsHandler(w http.ResponseWriter, r *http.Request) {
 	s := r.URL.Query().Get("author_id")
+	sorted := r.URL.Query().Get("sort")
 
 	var (
 		chirpsDTOS []database.Chirp;
@@ -161,6 +163,11 @@ func (cfg *apiConfig) getChirpsHandler(w http.ResponseWriter, r *http.Request) {
 
 	for i, c := range chirpsDTOS {
 		responseChirps[i] = MapChirpDTOToChirp(c)
+	}
+	if sorted == "asc" {
+		sort.Slice(responseChirps, func(i, j int) bool { return responseChirps[i].CreatedAt.Before(responseChirps[j].CreatedAt) })
+	} else {
+		sort.Slice(responseChirps, func(i, j int) bool { return responseChirps[i].CreatedAt.After(responseChirps[j].CreatedAt) })
 	}
 
 	respondWithJSON(w, 200, responseChirps)
