@@ -218,10 +218,14 @@ func (cfg *apiConfig) loginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	refreshToken, _ := auth.MakeRefreshToken()
-	parsedToken, _ := uuid.Parse(refreshToken)
+	refreshToken, err := auth.MakeRefreshToken()
+	if err != nil {
+		respondWithError(w, 500, "Something went wrong")
+		log.Printf("Error generating refresh secret: %s", err)
+		return
+	}
 	rt, err := cfg.db.CreateRefreshToken(r.Context(), database.CreateRefreshTokenParams{
-		Token: parsedToken,
+		Token: refreshToken,
 		UserID: userDTO.ID,
 		ExpiresAt: time.Now().Add(time.Hour * 24 * time.Duration(60)),
 		RevokedAt: sql.NullTime{},
@@ -234,7 +238,7 @@ func (cfg *apiConfig) loginHandler(w http.ResponseWriter, r *http.Request) {
 
 	user := MapUserDTOToUser(userDTO)
 	user.JWTToken = jwt
-	user.RefreshToken = rt.Token.String()
+	user.RefreshToken = rt.Token
 
 	respondWithJSON(w, 200, user)
 }
@@ -252,9 +256,7 @@ func (cfg *apiConfig) refreshHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	parsedToken, _ := uuid.Parse(token)
-
-	tokenDTO, err := cfg.db.GetRefreshTokenByToken(r.Context(), parsedToken)
+	tokenDTO, err := cfg.db.GetRefreshTokenByToken(r.Context(), token)
 
 	if err == sql.ErrNoRows {
 		log.Printf("Error refresh token has expired or doesn't exists: %s", err)
@@ -290,9 +292,7 @@ func (cfg *apiConfig) revokeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	parsedToken, _ := uuid.Parse(token)
-
-	if err := cfg.db.UpdateRefreshToken(r.Context(), parsedToken); err != nil {
+	if err := cfg.db.UpdateRefreshToken(r.Context(), token); err != nil {
 		log.Printf("Error fetching refresh token from a database: %s", err)
 		respondWithError(w, 401, "Refresh token is right")
 		return	
@@ -348,6 +348,58 @@ func (cfg *apiConfig) updateUserHandler(w http.ResponseWriter, r *http.Request) 
 	respondWithJSON(w, 200, user)
 }
 
-func (cfg *apiConfig) updateUserHandler(w http.ResponseWriter, r *http.Request) {
-	
+func (cfg *apiConfig) deleteChirpByIDHandler(w http.ResponseWriter, r *http.Request) {
+    token, err := auth.GetBearerToken(r.Header)
+    if err != nil {
+        log.Printf("Error fetching access token: %s", err)
+        respondWithError(w, 401, "Access token is not present")
+        return
+    }
+
+    userID, err := auth.ValidateJWT(token, cfg.secret)
+    if err != nil {
+        log.Printf("Invalid token: %s", err)
+        respondWithError(w, 403, "Access token is not valid")
+        return
+    }
+
+    chirpIDStr := r.PathValue("chirpID")
+    if chirpIDStr == "" {
+		log.Printf("ChirpID..error . userID %s", userID)
+        respondWithError(w, 404, "Not found")
+        return
+    }
+
+    chirpUUID, err := uuid.Parse(chirpIDStr)
+    if err != nil {
+        log.Printf("Invalid chirp_id: %s", err)
+        respondWithError(w, 400, "Bad request")
+        return
+    }
+
+    chirpDTO, err := cfg.db.GetChirpByID(r.Context(), chirpUUID)
+    if err != nil {
+        // no such chirp — return 404
+		log.Printf("userID %s", userID)
+        respondWithError(w, 404, "Not found")
+        return
+    }
+
+    if chirpDTO.UserID != userID {
+        // user authenticated, but doesn't own this chirp — forbidden
+        log.Printf("User %s not authorized to delete chirp %s", userID, chirpIDStr)
+        respondWithError(w, 403, "Not authorized")
+        return
+    }
+
+    if err := cfg.db.DeleteChirpByID(r.Context(), database.DeleteChirpByIDParams{
+        ID:     chirpUUID,
+        UserID: userID,
+    }); err != nil {
+        log.Printf("Error deleting chirp %s: %s", chirpIDStr, err)
+        respondWithError(w, 500, "Something went wrong")
+        return
+    }
+
+    w.WriteHeader(http.StatusNoContent) // 204, no body
 }

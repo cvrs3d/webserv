@@ -27,7 +27,7 @@ RETURNING token, created_at, updated_at, user_id, expires_at, revoked_at
 `
 
 type CreateRefreshTokenParams struct {
-	Token     uuid.UUID
+	Token     string
 	UserID    uuid.UUID
 	ExpiresAt time.Time
 	RevokedAt sql.NullTime
@@ -57,7 +57,7 @@ SELECT token, created_at, updated_at, user_id, expires_at, revoked_at FROM refre
 WHERE token = $1 AND expires_at > NOW() AND revoked_at is NULL
 `
 
-func (q *Queries) GetRefreshTokenByToken(ctx context.Context, token uuid.UUID) (RefreshToken, error) {
+func (q *Queries) GetRefreshTokenByToken(ctx context.Context, token string) (RefreshToken, error) {
 	row := q.db.QueryRowContext(ctx, getRefreshTokenByToken, token)
 	var i RefreshToken
 	err := row.Scan(
@@ -79,7 +79,7 @@ updated_at = NOW()
 WHERE token=$1
 `
 
-func (q *Queries) UpdateRefreshToken(ctx context.Context, token uuid.UUID) error {
+func (q *Queries) UpdateRefreshToken(ctx context.Context, token string) error {
 	_, err := q.db.ExecContext(ctx, updateRefreshToken, token)
 	return err
 }
