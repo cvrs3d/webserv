@@ -136,7 +136,20 @@ func (cfg *apiConfig) validateHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func (cfg *apiConfig) getChirpsHandler(w http.ResponseWriter, r *http.Request) {
-	chirpsDTOS, err := cfg.db.GetChirps(r.Context()) 
+	s := r.URL.Query().Get("author_id")
+
+	var (
+		chirpsDTOS []database.Chirp;
+		err error
+	)
+
+	if s != "" {
+		userId, _ := uuid.Parse(s)
+		chirpsDTOS, err = cfg.db.GetChirpsByAuthor(r.Context(), userId) 
+
+	} else {
+		chirpsDTOS, err = cfg.db.GetChirps(r.Context()) 
+	}
 
 	if err != nil {
 		log.Printf("Error retrieving chirps: %s", err)
