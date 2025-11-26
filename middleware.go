@@ -20,6 +20,7 @@ type apiConfig struct {
 	db *database.Queries
 	platform string
 	secret string
+	polkaAPIKey string
 }
 
 func (cfg *apiConfig) middlewareMetrics(next http.Handler) http.Handler {
@@ -402,4 +403,42 @@ func (cfg *apiConfig) deleteChirpByIDHandler(w http.ResponseWriter, r *http.Requ
     }
 
     w.WriteHeader(http.StatusNoContent) // 204, no body
+}
+
+func (cfg *apiConfig) polkaWebhookHandler(w http.ResponseWriter, r *http.Request) {
+	type data struct {
+		UserID uuid.UUID `json:"user_id"`
+	}
+	type parameters struct {
+		Event string `json:"event"`
+		Data data `json:"data"`
+	}
+
+	requestToken, err := auth.GetAPIKey(r.Header)
+
+	if err != nil  || requestToken != cfg.polkaAPIKey {
+        log.Printf("Error token is invalid %s", err)
+        respondWithError(w, 401, "Forbidden")
+        return
+	}
+
+	params := parameters{}
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&params); err != nil {
+		log.Printf("Error decoding parameters: %s", err)
+		respondWithError(w, 500, "Something went wrong")
+		return
+	}
+
+	if params.Event != "user.upgraded" {
+		respondWithJSON(w, 204, struct{}{})
+		return	
+	}
+
+	if err := cfg.db.UpgradeUser(r.Context(), params.Data.UserID); err != nil {
+		respondWithError(w, 404, "User not found")
+		return	
+	}
+
+	respondWithJSON(w, 204, struct{}{})
 }

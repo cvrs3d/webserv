@@ -20,6 +20,7 @@ func main() {
 	dbURL := os.Getenv("DB_URL")
 	platform := os.Getenv("PLATFORM")
 	secret := os.Getenv("PRIVATE_KEY")
+	polkaAPIKey := os.Getenv("POLKA_KEY")
 	db, err := sql.Open("postgres", dbURL)
 	if err != nil {
 		log.Fatal(err)
@@ -31,6 +32,7 @@ func main() {
 		db: dbQueries,
 		platform: platform,
 		secret: secret,
+		polkaAPIKey: polkaAPIKey,
 	}
 	multiplexer := http.NewServeMux()
 
@@ -55,6 +57,7 @@ func main() {
 	multiplexer.HandleFunc("PUT /api/users", apiCfg.updateUserHandler)
 	
 	multiplexer.HandleFunc("DELETE /api/chirps/{chirpID}", apiCfg.deleteChirpByIDHandler)
+	multiplexer.HandleFunc("POST /api/polka/webhooks", apiCfg.polkaWebhookHandler)
 	
 
 

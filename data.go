@@ -14,6 +14,7 @@ type User struct {
 	Email	  	 string    `json:"email"`
 	JWTToken  	 string	   `json:"token,omitempty"`
 	RefreshToken string	   `json:"refresh_token,omitempty"`
+	IsChirpyRed	 bool	   `json:"is_chirpy_red"`
 }
 
 type Chirp struct {
@@ -30,6 +31,7 @@ func MapUserDTOToUser(dto database.User) User {
 		CreatedAt: dto.CreatedAt,
 		UpdatedAt: dto.UpdatedAt,
 		Email: dto.Email,
+		IsChirpyRed: dto.IsChirpyRed.Bool,
 	}
 }
 

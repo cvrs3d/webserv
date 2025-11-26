@@ -23,3 +23,10 @@ hashed_password=$1,
 email=$2
 WHERE id=$3
 RETURNING *;
+
+-- name: UpgradeUser :exec
+UPDATE users
+SET 
+is_chirpy_red=TRUE,
+updated_at=NOW()
+WHERE id=$1;

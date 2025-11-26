@@ -49,3 +49,28 @@ func GetBearerToken(headers http.Header) (string, error) {
 
     return tokenString, nil
 }
+
+func GetAPIKey(headers http.Header) (string, error) {
+    headerValue := headers.Get("Authorization")
+    if headerValue == "" {
+        return "", fmt.Errorf("authorization header missing")
+    }
+
+    headerValue = strings.TrimSpace(headerValue)
+    parts := strings.Fields(headerValue)
+    if len(parts) < 2 {
+        return "", fmt.Errorf("authorization header format must be \"ApiKey <token>\", authorization token is empty")
+    }
+
+    scheme := parts[0]
+    if !strings.EqualFold(scheme, "ApiKey") {
+        return "", fmt.Errorf("ApiKey scheme must be ApiKey, got %q", scheme)
+    }
+
+    tokenString := parts[1]
+    if tokenString == "" {
+        return "", fmt.Errorf("ApiKey token is empty")
+    }
+
+    return tokenString, nil
+}
